@@ -76,13 +76,15 @@
         footer { width: 100%; position: relative; margin-top: 40px; z-index: 10; }
         .footer-line { height: 6px; background: linear-gradient(to right, #4f46e5, #7c3aed, #f59e0b); }
         .footer-text { background: #05060a; padding: 16px 0; text-align: center; font-size: 12px; color: #4b5563; }
+        
         .admin-modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(12px); z-index: 50; display: none; align-items: center; justify-content: center; }
         .admin-modal.active { display: flex; }
         .admin-content { background: rgba(12, 13, 20, 0.95); border: 1px solid rgba(255, 255, 255, 0.1); width: 100%; max-width: 500px; border-radius: 16px; padding: 24px; position: relative; }
         .close-btn { position: absolute; top: 16px; right: 20px; background: transparent; border: none; color: #9ca3af; font-size: 20px; cursor: pointer; }
-        .form-group { display: flex; flex-direction: column; gap: 14px; background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 12px; margin-top: 14px; }
-        .input-style { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); padding: 10px; border-radius: 8px; color: #fff; font-size: 14px; outline: none; }
-        .submit-btn { background: #dc2626; border: none; color: #fff; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+        .form-group { display: flex; flex-direction: column; gap: 14px; background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 12px; margin-top: 14px; text-align: left; }
+        .input-style { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); padding: 10px; border-radius: 8px; color: #fff; font-size: 14px; outline: none; width: 100%; }
+        .submit-btn { background: #10b981; border: none; color: #fff; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; width: 100%; }
+        .submit-btn.delete { background: #dc2626; }
         .clear-all-btn { background: #b91c1c; border: 1px solid #ef4444; color: #fff; padding: 12px; border-radius: 8px; font-weight: 700; width: 100%; cursor: pointer; }
     </style>
 </head>
@@ -134,25 +136,41 @@
     <div id="adminPanel" class="admin-modal">
         <div class="admin-content">
             <button id="closeAdminBtn" class="close-btn">X</button>
-            <h2>⚙️ Панель управления игроками</h2>
+            <h2 style="font-size:18px;margin-bottom:10px;">⚙️ Автономное управление таблицей LATIERS</h2>
+            
             <div class="form-group">
-                <label>Введи ник игрока для удаления:</label>
-                <input type="text" id="delName" class="input-style" placeholder="Например: Fixator_PvP">
-                <button id="delPlayerBtn" class="submit-btn">Удалить игрока</button>
+                <label style="font-size:12px;color:#9ca3af;">Добавить / Обновить игрока:</label>
+                <input type="text" id="addName" class="input-style" placeholder="Никнейм (Например: Fixator_PvP)">
+                <input type="text" id="addTier" class="input-style" placeholder="Тир (Например: HT1, LT3, HT5)">
+                <button id="addPlayerBtn" class="submit-btn">✅ Сохранить игрока</button>
             </div>
-            <button id="clearAllBtn" class="clear-all-btn">Полная очистка всей таблицы</button>
+
+            <div class="form-group">
+                <label style="font-size:12px;color:#9ca3af;">Удалить игрока:</label>
+                <input type="text" id="delName" class="input-style" placeholder="Введи ник для удаления">
+                <button id="delPlayerBtn" class="submit-btn delete">❌ Удалить игрока</button>
+            </div>
+            <button id="clearAllBtn" class="clear-all-btn">🗑️ Полная очистка всей таблицы</button>
         </div>
     </div>
     <script>
         let playersData = []; 
         
-        // Вставь сюда в кавычки интернет-ссылку tunnelmole из твоего черного окна CMD!
-        const API_URL = 'ВСТАВЬ_СЮДА_ССЫЛКУ_ОТ_БОТА/api/players';
-
         const tierPoints = { 
             'HT1': 60, 'LT1': 50, 'HT2': 45, 'LT2': 40, 
             'HT3': 30, 'LT3': 20, 'HT4': 15, 'LT4': 10, 'HT5': 5, 'LT5': 2 
         };
+
+        function loadLocalData() {
+            const saved = localStorage.getItem('latiers_leaderboard');
+            playersData = saved ? JSON.parse(saved) : [];
+            renderTable();
+        }
+
+        function saveLocalData() {
+            localStorage.setItem('latiers_leaderboard', JSON.stringify(playersData));
+            renderTable();
+        }
 
         function renderTable() {
             const tbody = document.getElementById('leaderboardBody');
@@ -190,7 +208,6 @@
                     const tStr = player.tier.toUpperCase();
                     const arrow = tStr.startsWith('HT') ? '<span class="arrow-up">▲</span>' : '<span class="arrow-down">▼</span>';
                     
-                    // 👤 Автономная иконка, которая убирает блокировки Windows навсегда
                     const cardHtml = '<div class="grid-player-card"><div class="grid-player-left"><span style="font-size: 16px; margin-right: 6px;">👤</span><span class="grid-player-name">' + player.name + '</span></div><div class="tier-cell"><span class="t-badge t-' + player.tier.toLowerCase() + '">' + tStr + '</span>' + arrow + '</div></div>';
                     
                     if (tStr.includes('1')) c1.innerHTML += cardHtml;
@@ -204,24 +221,6 @@
             [c1, c2, c3, c4, c5].forEach(c => {
                 if (c.innerHTML === '') c.innerHTML = '<div class="no-players-text">Пусто</div>';
             });
-        }
-
-        async function fetchLiveTiers() { 
-            try { 
-                const response = await fetch(API_URL); 
-                if (response.ok) { playersData = await response.json(); renderTable(); } 
-            } catch(e) { console.error(e); } 
-        }
-
-        async function sendAdminAction(action, name = '') { 
-            try { 
-                await fetch(API_URL.replace('/players', '/admin'), { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ action: action, name: name }) 
-                }); 
-                fetchLiveTiers();
-            } catch(e) { console.error(e); } 
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -250,19 +249,44 @@
             document.getElementById('closeAdminBtn').addEventListener('click', () => {
                 document.getElementById('adminPanel').classList.remove('active');
             });
+
+            document.getElementById('addPlayerBtn').addEventListener('click', () => {
+                const nameIn = document.getElementById('addName');
+                const tierIn = document.getElementById('addTier');
+                const name = nameIn.value.trim();
+                const tier = tierIn.value.trim().toUpperCase();
+
+                if(!name || !tier) return alert('Заполните оба поля!');
+
+                const existingIndex = playersData.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
+                if (existingIndex !== -1) {
+                    playersData[existingIndex].tier = tier;
+                } else {
+                    playersData.push({ name: name, tier: tier });
+                }
+
+                saveLocalData();
+                nameIn.value = ''; tierIn.value = '';
+                alert('Игрок успешно сохранен!');
+            });
             
             document.getElementById('delPlayerBtn').addEventListener('click', () => { 
                 const input = document.getElementById('delName'); 
-                sendAdminAction('delete', input.value); 
+                const name = input.value.trim();
+                playersData = playersData.filter(p => p.name.toLowerCase() !== name.toLowerCase());
+                saveLocalData();
                 input.value = '';
+                alert('Игрок удален!');
             });
             
             document.getElementById('clearAllBtn').addEventListener('click', () => { 
-                if (confirm('Очистить всю таблицу?')) { sendAdminAction('clear'); } 
+                if (confirm('Очистить всю таблицу?')) { 
+                    playersData = [];
+                    saveLocalData();
+                } 
             });
             
-            fetchLiveTiers(); 
-            setInterval(fetchLiveTiers, 3000);
+            loadLocalData();
         });
     </script>
 </body>
