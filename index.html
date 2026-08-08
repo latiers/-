@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LATIERS - Игровой Портал</title>
+    <title>LATIERS - Игровой Portal</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -132,29 +132,39 @@
     </main>
 
     <footer><div class="footer-line"></div><div class="footer-text">© 2026 LATIERS. Все права reserved.</div></footer>
-
-    <div id="adminPanel" class="admin-modal">
-        <div class="admin-content">
-            <button id="closeAdminBtn" class="close-btn">X</button>
-            <h2>⚙️ Панель управления игроками</h2>
-            <div class="form-group">
-                <label>Введи ник игрока для удаления:</label>
-                <input type="text" id="delName" class="input-style" placeholder="Например: Fixator_PvP">
-                <button id="delPlayerBtn" class="submit-btn">Удалить игрока</button>
-            </div>
-            <button id="clearAllBtn" class="clear-all-btn">Полная очистка всей таблицы</button>
-        </div>
-    </div>
     <script>
         let playersData = []; 
         
-        // СТУПЕНЬ СВЯЗИ: Сайт будет стучаться на твой запущенный домашний ПК
-        const API_URL = 'http://localhost:3000/api/players';
+        // ТВОЯ ЛИЧНАЯ ССЫЛКА ВЕБХУКА ДЛЯ ЧТЕНИЯ КАНАЛА ИЗ ИНТЕРНЕТА
+        const WEBHOOK_URL = 'https://discord.com/api/webhooks/1535725584888500325/PT70TtX6kF8PT8ZT-w3VnJ1vzrE9yKOnZV7ZITUjMDAmO4Wrh14-b2mgLIOwbN6Xma2x';
 
         const tierPoints = { 
             'HT1': 60, 'LT1': 50, 'HT2': 45, 'LT2': 40, 
             'HT3': 30, 'LT3': 20, 'HT4': 15, 'LT4': 10, 'HT5': 5, 'LT5': 2 
         };
+
+        // Сайт круглосуточно скачивает логи из Дискорда и сам строит общий тир-лист
+        async function fetchLiveTiers() { 
+            try { 
+                const response = await fetch(WEBHOOK_URL); 
+                if (response.ok) { 
+                    const messages = await response.json();
+                    playersData = [];
+                    
+                    messages.forEach(msg => {
+                        if (msg.content && msg.content.startsWith('LATIERS_DATA:')) {
+                            const parts = msg.content.split(':');
+                            const name = parts[1];
+                            const tier = parts[2];
+                            if (name && tier && !playersData.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+                                playersData.push({ name: name, tier: tier });
+                            }
+                        }
+                    });
+                    renderTable(); 
+                } 
+            } catch(e) { console.error(e); } 
+        }
 
         function renderTable() {
             const tbody = document.getElementById('leaderboardBody');
@@ -165,20 +175,16 @@
             const c5 = document.getElementById('col-tier5');
 
             if (!tbody || !c1 || !c2 || !c3 || !c4 || !c5) return;
-            
-            tbody.innerHTML = '';
-            c1.innerHTML = ''; c2.innerHTML = ''; c3.innerHTML = ''; c4.innerHTML = ''; c5.innerHTML = '';
+            tbody.innerHTML = ''; c1.innerHTML = ''; c2.innerHTML = ''; c3.innerHTML = ''; c4.innerHTML = ''; c5.innerHTML = '';
             
             if (playersData.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="4" class="no-data-msg">Синхронизация данных...</td></tr>';
             } else {
                 playersData.sort((a, b) => (tierPoints[b.tier] || 0) - (tierPoints[a.tier] || 0));
-                
                 playersData.forEach((player, index) => {
                     const tr = document.createElement('tr');
                     const pts = tierPoints[player.tier] || 0;
                     const arrow = player.tier.toUpperCase().startsWith('HT') ? '<span class="arrow-up">▲</span>' : '<span class="arrow-down">▼</span>';
-                    
                     tr.innerHTML = '<td>#' + (index + 1) + '</td><td class="player-nick">' + player.name + '</td><td><div class="tier-cell"><span class="t-badge t-' + player.tier.toLowerCase() + '">' + player.tier.toUpperCase() + '</span>' + arrow + '</div></td><td class="pts-count" style="text-align: right;">' + pts + ' PTS</td>';
                     tbody.appendChild(tr);
                 });
@@ -191,9 +197,7 @@
                 playersData.forEach(player => {
                     const tStr = player.tier.toUpperCase();
                     const arrow = tStr.startsWith('HT') ? '<span class="arrow-up">▲</span>' : '<span class="arrow-down">▼</span>';
-                    
                     const cardHtml = '<div class="grid-player-card"><div class="grid-player-left"><span style="font-size: 16px; margin-right: 6px;">👤</span><span class="grid-player-name">' + player.name + '</span></div><div class="tier-cell"><span class="t-badge t-' + player.tier.toLowerCase() + '">' + tStr + '</span>' + arrow + '</div></div>';
-                    
                     if (tStr.includes('1')) c1.innerHTML += cardHtml;
                     else if (tStr.includes('2')) c2.innerHTML += cardHtml;
                     else if (tStr.includes('3')) c3.innerHTML += cardHtml;
@@ -201,69 +205,15 @@
                     else if (tStr.includes('5')) c5.innerHTML += cardHtml;
                 });
             }
-
-            [c1, c2, c3, c4, c5].forEach(c => {
-                if (c.innerHTML === '') c.innerHTML = '<div class="no-players-text">Пусто</div>';
-            });
-        }
-
-        async function fetchLiveTiers() { 
-            try { 
-                const response = await fetch(API_URL); 
-                if (response.ok) { playersData = await response.json(); renderTable(); } 
-            } catch(e) { console.error(e); } 
-        }
-
-        async function sendAdminAction(action, name = '') { 
-            try { 
-                await fetch(API_URL.replace('/players', '/admin'), { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ action: action, name: name }) 
-                }); 
-                fetchLiveTiers();
-            } catch(e) { console.error(e); } 
+            [c1, c2, c3, c4, c5].forEach(c => { if (c.innerHTML === '') c.innerHTML = '<div class="no-players-text">Пусто</div>'; });
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            const oBtn = document.getElementById('tabOverall'); 
-            const sBtn = document.getElementById('tabSword'); 
-            
-            const oCont = document.getElementById('contentOverall'); 
-            const sCont = document.getElementById('contentSword');
-
-            oBtn.addEventListener('click', () => { 
-                oBtn.classList.add('active'); sBtn.classList.remove('active');
-                oCont.style.display = 'block'; sCont.style.display = 'none';
-            });
-            
-            sBtn.addEventListener('click', () => { 
-                sBtn.classList.add('active'); oBtn.classList.remove('active');
-                sCont.style.display = 'grid'; oCont.style.display = 'none';
-            });
-
-            document.addEventListener('keydown', e => { 
-                if (e.ctrlKey && e.shiftKey && (e.key.toLowerCase() === 'a' || e.key.toLowerCase() === 'ф')) {
-                    document.getElementById('adminPanel').classList.toggle('active'); 
-                }
-            });
-            
-            document.getElementById('closeAdminBtn').addEventListener('click', () => {
-                document.getElementById('adminPanel').classList.remove('active');
-            });
-            
-            document.getElementById('delPlayerBtn').addEventListener('click', () => { 
-                const input = document.getElementById('delName'); 
-                sendAdminAction('delete', input.value); 
-                input.value = '';
-            });
-            
-            document.getElementById('clearAllBtn').addEventListener('click', () => { 
-                if (confirm('Очистить всю таблицу?')) { sendAdminAction('clear'); } 
-            });
-            
-            fetchLiveTiers(); 
-            setInterval(fetchLiveTiers, 3000);
+            const oBtn = document.getElementById('tabOverall'); const sBtn = document.getElementById('tabSword'); 
+            const oCont = document.getElementById('contentOverall'); const sCont = document.getElementById('contentSword');
+            oBtn.addEventListener('click', () => { oBtn.classList.add('active'); sBtn.classList.remove('active'); oCont.style.display = 'block'; sCont.style.display = 'none'; });
+            sBtn.addEventListener('click', () => { sBtn.classList.add('active'); oBtn.classList.remove('active'); sCont.style.display = 'grid'; oCont.style.display = 'none'; });
+            fetchLiveTiers(); setInterval(fetchLiveTiers, 4000);
         });
     </script>
 </body>
